@@ -28,78 +28,57 @@
 #                is connected.
 # FUSES ........ Parameters for avrdude to flash the fuses appropriately.
 
-DEVICE     ?= atmega328p
-CLOCK      = 16000000
-PROGRAMMER ?= -c avrisp2 -P usb
-SOURCE    = main.c motion_control.c gcode.c protocol.c report.c \
-             stepper.c settings.c planner.c nuts_bolts.c system.c
-BUILDDIR = build
-SOURCEDIR = src
-# FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m
-FUSES      = -U hfuse:w:0xd2:m -U lfuse:w:0xff:m
+DEBUG		= 1
 
-# Tune the lines below only if you know what you are doing:
+# Target
+TARGET		= xyz_motion_control
 
-AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE) -B 10 -F
+DEVICE		?= stm32
+CLOCK		= 16000000
+CC			= gcc
+CFLAG		= -DF_CPU=${CLOCK}
+SOURCE		= main.c gcode.c motion_control.c nuts_bolts.c planner.c protocol.c report.c \
+            stepper.c settings.c system.c \
+			 
+BUILDDIR	= build
+SOURCEDIR	= src
 
-# Compile flags for avr-gcc v4.8.1. Does not produce -flto warnings.
-# COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) -I. -ffunction-sections
+# Libraries
+LIBS		= -lm
+LDFLAG		= $(LIBS) -Wl,-Map=$(BUILDDIR)/$(TARGET).map,--cref -Wl,--gc-sections
 
-# Compile flags for avr-gcc v4.9.2 compatible with the IDE. Or if you don't care about the warnings. 
-COMPILE = gcc -g -Wno-unused-variable -Os -DF_CPU=$(CLOCK) -I. -ffunction-sections -flto
 
+ifeq ($(DEBUG), 1)
+CFLAG += -g -Wall -O0 
+LDFLAG += -v
+endif
 
 OBJECTS = $(addprefix $(BUILDDIR)/,$(notdir $(SOURCE:.c=.o)))
 
+
 # symbolic targets:
-all:	grbl.hex
+all:	$(TARGET).hex
 
-$(BUILDDIR)/%.o: $(SOURCEDIR)/%.c
-	$(COMPILE) -MMD -MP -c $< -o $@
-
-.S.o:
-	$(COMPILE) -x assembler-with-cpp -c $< -o $(BUILDDIR)/$@
-# "-x assembler-with-cpp" should not be necessary since this is the default
-# file type for the .S (with capital S) extension. However, upper case
-# characters are not always preserved on Windows. To ensure WinAVR
-# compatibility define the file type manually.
-
-#.c.s:
-	$(COMPILE) -S $< -o $(BUILDDIR)/$@
-
-flash:	all
-	$(AVRDUDE) -U flash:w:grbl.hex:i
-
-fuse:
-	$(AVRDUDE) $(FUSES)
-
-# Xcode uses the Makefile targets "", "clean" and "install"
-install: flash fuse
-
-# if you use a bootloader, change the command below appropriately:
-load: all
-	bootloadHID grbl.hex
-
-clean:
-	rm -f grbl.hex $(BUILDDIR)/*.o $(BUILDDIR)/*.d $(BUILDDIR)/*.elf
+$(TARGET).hex: $(BUILDDIR)/main.elf
+	rm -f $(TARGET).hex
 
 # file targets:
 $(BUILDDIR)/main.elf: $(OBJECTS)
-	$(COMPILE) -o $(BUILDDIR)/main.elf $(OBJECTS) -lm -Wl,-dead_strip
+	$(CC) $(OBJECTS) $(LDFLAG) -o $(BUILDDIR)/main.elf
 
-grbl.hex: $(BUILDDIR)/main.elf
-	rm -f grbl.hex
-# avr-objcopy -j .text -j .data -O ihex $(BUILDDIR)/main.elf grbl.hex
-# avr-size --format=berkeley $(BUILDDIR)/main.elf
-# If you have an EEPROM section, you must also create a hex file for the
-# EEPROM and add it to the "flash" target.
+$(BUILDDIR)/%.o: $(SOURCEDIR)/%.c
+	$(CC) $(CFLAG) -MMD -MP -c $< -o $@
 
-# Targets for code debugging and analysis:
-disasm:	main.elf
-	avr-objdump -d $(BUILDDIR)/main.elf
+$(BUILDDIR):
+	mkdir $@
+
 
 cpp:
-	$(COMPILE) -E $(SOURCEDIR)/main.c
+	$(CC) -E $(SOURCEDIR)/main.c
+
+clean:
+	rm -f $(TARGET).hex $(BUILDDIR)/*.o $(BUILDDIR)/*.d $(BUILDDIR)/*.elf
+
 
 # include generated header dependencies
 -include $(BUILDDIR)/$(OBJECTS:.o=.d)

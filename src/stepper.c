@@ -20,8 +20,6 @@
 */
 
 #include "core.h"
-#include "stepper.h"
-#include "planner.h"
 
 // Some useful constants.
 #define DT_SEGMENT (1.0 / (ACCELERATION_TICKS_PER_SECOND * 60.0)) // min/segment

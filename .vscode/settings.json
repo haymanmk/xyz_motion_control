@@ -8,5 +8,6 @@
       "binaryPath": "/Users/haymanchan/workspace/CC++/xyz_motion_control/build/main.elf",
       "binaryArgs": []
     }
-  ]
+  ],
+  "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools"
 }
